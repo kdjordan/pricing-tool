@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, type Ref, onBeforeUnmount } from 'vue';
 import Papa from 'papaparse';
 
 interface ParsedResults {
-  data: string[][];
+  data: string[];
 }
 
 interface FileEmit {
@@ -19,20 +19,27 @@ const emit = defineEmits(['file-selected']);
 
 const file = ref<File | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
-const columns = ref<string[]>([]);
-const csvData = ref<string[][]>([]);
-const columnRoles = ref<string[]>([]);
+const columns: Ref<string[]> = ref([]);
+const csvData: Ref<string[][]> = ref([]);
+const columnRoles: Ref<string[]> = ref([]);
 const isDragOver = ref<boolean>(false);
 const showModal = ref<boolean>(false);
 const startLine = ref<number>(1);
 const loading = ref<boolean>(false);
+let worker: Worker | null = null;
+
+onBeforeUnmount(() => {
+  if (worker) {
+    worker.terminate();
+  }
+});
 
 function handleFileUpload(event: Event) {
   const target = event.target as HTMLInputElement;
   const uploadedFile = target.files?.[0] ?? null;
   if (uploadedFile) {
     file.value = uploadedFile;
-    parseCSV(uploadedFile);
+    parseInitialCSV(uploadedFile);
   }
 }
 
@@ -40,7 +47,7 @@ function handleDrop(event: DragEvent) {
   const uploadedFile = event.dataTransfer?.files[0] ?? null;
   if (uploadedFile) {
     file.value = uploadedFile;
-    parseCSV(uploadedFile);
+    parseInitialCSV(uploadedFile);
   }
   isDragOver.value = false;
 }
@@ -53,16 +60,47 @@ function dragLeave() {
   isDragOver.value = false;
 }
 
-function parseCSV(uploadedFile: File) {
+function parseInitialCSV(uploadedFile: File) {
+  console.log('Parsing initial rows');
   Papa.parse(uploadedFile, {
     header: false,
-    complete(results: ParsedResults) {
-      csvData.value = results.data.slice(0, 1000); // Slice to get only the first 100 rows
-      columns.value = results.data[startLine.value - 1];
-      columnRoles.value = Array(columns.value.length).fill('');
-      showModal.value = true;
+    worker: true,
+    step(results: ParsedResults, parser) {
+      console.log('Parsed row:', results.data);
+      if (csvData.value.length < 50) {
+        csvData.value.push(results.data as string[]);
+        if (csvData.value.length === 50) {
+          parser.abort();
+          columns.value = csvData.value[startLine.value - 1];
+          columnRoles.value = Array(columns.value.length).fill('');
+          showModal.value = true;
+          console.log('Initial parsing complete, opening modal');
+          parseRemainingCSV(uploadedFile);
+        }
+      }
+    },
+    error(error) {
+      console.error('Error during initial parsing:', error);
     },
   });
+}
+
+function parseRemainingCSV(uploadedFile: File) {
+  console.log('Parsing remaining rows in background');
+  worker = new Worker(new URL('../assets/worker.ts', import.meta.url), {
+    type: 'module',
+  });
+  worker.onmessage = function (e) {
+    if (e.data.type === 'row') {
+      csvData.value.push(e.data.row as string[]);
+    } else if (e.data.type === 'complete') {
+      console.log('Background parsing complete');
+      worker?.terminate();
+    } else if (e.data.type === 'error') {
+      console.error('Error during background parsing:', e.data.error);
+    }
+  };
+  worker.postMessage({ file: uploadedFile, startLine: csvData.value.length + 1 });
 }
 
 function confirmColumnRoles() {
@@ -151,9 +189,7 @@ function selectFile(): void {
                         v-model="startLine"
                         class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                       >
-                        <option v-for="i in 10" :key="i" :value="i">
-                          {{ i }}
-                        </option>
+                        <option v-for="i in 10" :key="i" :value="i">{{ i }}</option>
                       </select>
                     </div>
                   </div>
@@ -180,15 +216,9 @@ function selectFile(): void {
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-gray-200">
-                        <tr v-for="(row, rowIndex) in csvData" :key="rowIndex">
+                        <tr v-for="(row, rowIndex) in csvData.slice(startLine - 1)" :key="rowIndex">
                           <td class="border px-4 py-2">{{ rowIndex + 1 }}</td>
-                          <td
-                            v-for="(cell, cellIndex) in row"
-                            :key="cellIndex"
-                            class="px-6 py-4 whitespace-nowrap"
-                          >
-                            {{ cell }}
-                          </td>
+                          <td v-for="(cell, cellIndex) in row" :key="cellIndex" class="px-6 py-4 whitespace-nowrap">{{ cell }}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -207,7 +237,7 @@ function selectFile(): void {
               <button
                 @click="cancelModal"
                 type="button"
-                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
               >
                 Cancel
               </button>
@@ -220,42 +250,36 @@ function selectFile(): void {
 </template>
 
 <style scoped>
-  .drop-zone {
-    transition: border-color 0.3s ease;
-  }
-  .loader {
-    border-top-color: #3498db;
-    -webkit-animation: spinner 0.6s linear infinite;
-    animation: spinner 0.6s linear infinite;
-  }
+.drop-zone {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-  @-webkit-keyframes spinner {
-    0% {
-      -webkit-transform: rotate(0deg);
-      transform: rotate(0deg);
-    }
-    100% {
-      -webkit-transform: rotate(360deg);
-      transform: rotate(360deg);
-    }
-  }
+.loader {
+  border-top-color: #3498db;
+  -webkit-animation: spin 1s ease-in-out infinite;
+  animation: spin 1s ease-in-out infinite;
+  width: 48px;
+  height: 48px;
+}
 
-  @keyframes spinner {
-    0% {
-      -webkit-transform: rotate(0deg);
-      transform: rotate(0deg);
-    }
-    100% {
-      -webkit-transform: rotate(360deg);
-      transform: rotate(360deg);
-    }
+@-webkit-keyframes spin {
+  0% {
+    -webkit-transform: rotate(0deg);
   }
-  .modal-enter-active,
-  .modal-leave-active {
-    transition: opacity 0.5s;
+  100% {
+    -webkit-transform: rotate(360deg);
   }
-  .modal-enter,
-  .modal-leave-to {
-    opacity: 0;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
   }
+  100% {
+    transform: rotate(360deg);
+  }
+}
 </style>
