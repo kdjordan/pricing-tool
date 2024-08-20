@@ -1,9 +1,6 @@
 import { ref } from 'vue';
 import Papa from 'papaparse';
-import {
-	type StandardizedData,
-	type ParsedResults,
-} from '../../types/app-types';
+import { type StandardizedData } from '../../types/app-types';
 import { useDBstate } from '@/stores/dbStore';
 import useIndexedDB from './useIndexDB';
 
@@ -11,7 +8,6 @@ const { storeInIndexedDB, deleteObjectStore } =
 	useIndexedDB();
 
 const DBstore = useDBstate();
-
 
 export default function useCSVProcessing() {
 	const file = ref<File | null>(null);
@@ -22,6 +18,10 @@ export default function useCSVProcessing() {
 	const previewData = ref<string[][]>([]);
 	const columns = ref<string[]>([]);
 	const showModal = ref<boolean>(false);
+
+	function setFile(uploadedFile: File) {
+		file.value = uploadedFile;
+	}
 
 	async function parseCSVForFullProcessing(): Promise<void> {
 		if (!file.value) {
@@ -69,7 +69,7 @@ export default function useCSVProcessing() {
 								}
 							});
 							// Validate destName is a string
-							
+
 							const isValidDestName = typeof standardizedRow.destName === 'string' && standardizedRow.destName.length > 0;
 
 							// Validate dialCode can be cast into a number
@@ -88,7 +88,7 @@ export default function useCSVProcessing() {
 						//stay in local file 
 						storeDataInIndexedDB(standardizedData);
 					},
-					error: function(error) {
+					error: function (error) {
 						console.error('Error parsing CSV:', error);
 						// Handle error appropriately, e.g., show a message to the user
 					}
@@ -103,6 +103,7 @@ export default function useCSVProcessing() {
 
 
 	function parseCSVForPreview(uploadedFile: File) {
+		file.value = uploadedFile; // Set the file here as well
 		try {
 			Papa.parse(uploadedFile, {
 				header: false,
@@ -121,7 +122,7 @@ export default function useCSVProcessing() {
 	}
 
 	//function reaches out to IndesBB composable to store data
-	async function storeDataInIndexedDB(data: StandardizedData[]) {	
+	async function storeDataInIndexedDB(data: StandardizedData[]) {
 		console.log('storing with ', DBname.value, componentName.value)
 		try {
 			if (file.value) {
@@ -228,6 +229,7 @@ export default function useCSVProcessing() {
 		columnRoles,
 		parseCSVForPreview,
 		parseCSVForFullProcessing,
-		removeFromDB
+		removeFromDB,
+		setFile, // Add this new function
 	};
 }

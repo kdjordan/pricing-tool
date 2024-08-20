@@ -1,62 +1,19 @@
 <template>
-	<div
-		class="rounded-lg"
-	>
-			<p class="mb-8 text-center uppercase text-accent">{{ displayMessage }}</p>
-		<div
-			class="px-6 rounded-lg shadow-xl flex flex-col items-center justify-between bg-background w-full py-8"
-		>
-			<div
-				:class="[
-					'border border-mutedForeground rounded-md flex items-center justify-center tracking-wide text-primary hover:bg-muted transition-colors cursor-pointer w-full',
-					{
-						pulse: DBstore.isComponentFileUploading(
-							props.componentName
-						),
-						fileLoaded: props.disabled,
-					},
-				]"
-				@dragover.prevent="onDragOver"
-				@drop.prevent="onDrop"
-				@dragenter="onDragEnter"
-				@dragleave="onDragLeave"
-				@click="selectFile"
-			>
-				<div class="flex flex-col items-center gap-10 py-10 text-foreground">
-					<p
-						:class="{
-							'text-white': DBstore.isComponentFileUploading(
-								props.componentName
-							),
-						}"
-					>
-						{{ statusMessage }}
-					</p>
-
-					<UploadIcon
-						v-if="!props.disabled"
-						class="w-8 h-8 text-primary"
-					/>
-				</div>
-
-				<input
-					type="file"
-					@change="handleFileUpload"
-					accept=".csv"
-					hidden
-					:disabled="props.disabled || DBstore.globalFileIsUploading"
-					ref="fileInput"
-				/>
-			</div>
-			<button
-				v-if="DBstore.isComponentDisabled(props.componentName)"
-				@click="removeFromDB"
-				class="btn btn-destructive"
-			>
-				Remove
-			</button>
-		</div>
-		<!-- Column Roles Modal -->
+	<div class="rounded-lg">
+		<p class="mb-8 text-center uppercase text-accent">
+			{{ displayMessage }}
+		</p>
+		<FileUploadZone
+			:disabled="props.disabled || isUploading"
+			:is-uploading="isUploading"
+			:is-file-uploaded="!!file"
+			:uploaded-file-name="file?.name || ''"
+			:upload-progress="uploadProgress"
+			:status-message="statusMessage"
+			@file-selected="handleFileSelected"
+			@file-dropped="handleFileSelected"
+			@remove-file="handleRemoveFile"
+		/>
 		<TheModal
 			v-show="showModal"
 			:showModal="showModal"
@@ -72,12 +29,17 @@
 </template>
 
 <script setup lang="ts">
+	import { ref, watch, computed, defineEmits } from 'vue';
 	import TheModal from './TheModal.vue';
+	import FileUploadZone from './FileUploadZone.vue';
 	import { AZColumnRole } from '../../types/app-types';
-	import UploadIcon from './UploadIcon.vue';
-	import { ref, watch } from 'vue';
-	import useCSVProcessing from '../composables/useCsvFilesFunctions';
+	import useCSVProcessing from '@/composables/useCsvFilesFunctions';
 	import { useDBstate } from '@/stores/dbStore';
+	import useFileUpload from '@/composables/useFileUpload';
+	import useIndexedDB from '@/composables/useIndexDB';
+
+	// Extract the uploadFile function from the useFileUpload composable
+	const { uploadFile } = useFileUpload();
 
 	// Component props
 	const props = defineProps<{
@@ -90,7 +52,6 @@
 
 	// Extract functions and reactive properties from useCSVProcessing composable
 	const {
-		file,
 		startLine,
 		columnRoles,
 		columns,
@@ -101,12 +62,10 @@
 		parseCSVForFullProcessing,
 		parseCSVForPreview,
 		removeFromDB,
+		setFile,
 	} = useCSVProcessing();
 
 	// Define reactive properties
-	const fileInput = ref<HTMLInputElement | null>(null);
-	const isDragOver = ref<boolean>(false);
-	const statusMessage = ref<string>('Drag file or click to upload');
 	const displayMessage = ref<string>('');
 
 	// Set DB name and component name from props
@@ -139,16 +98,13 @@
 
 	// Watch for changes in fileUploading and disabled prop
 	watch(
-		[
-			() => DBstore.isComponentFileUploading(props.componentName),
-			() => props.disabled,
-		],
-		([localDBloadingVal, disabledVal]) => {
-			if (localDBloadingVal) {
-				statusMessage.value = 'Working on it...';
-			} else if (disabledVal) {
+		() => props.disabled,
+		(disabledVal) => {
+			if (disabledVal) {
 				statusMessage.value = 'Success';
 				updateDisplayMessage('complete');
+			} else {
+				statusMessage.value = 'Drag file here or click to load.';
 			}
 		}
 	);
@@ -158,51 +114,19 @@
 		updateDisplayMessage('complete');
 	}
 
-	function handleFileUpload(event: Event) {
-		const target = event.target as HTMLInputElement | null;
-		if (target && target.files) {
-			const uploadedFile = target.files[0];
-			if (uploadedFile) {
-				file.value = uploadedFile;
-				parseCSVForPreview(uploadedFile);
-			}
-		}
+	const file = ref<File | null>(null);
+
+	function handleFileSelected(uploadedFile: File) {
+		file.value = uploadedFile;
+		setFile(uploadedFile);
+		parseCSVForPreview(uploadedFile);
 	}
 
-	function resetLocalState() {
-		file.value = null;
-		fileInput.value = null;
+	function resetComponentState() {
 		columns.value = [];
 		previewData.value = [];
 		columnRoles.value = [];
 		statusMessage.value = 'Drag file here or click to load.';
-	}
-
-	function onDrop(event: DragEvent) {
-		const uploadedFile = event.dataTransfer?.files[0] ?? null;
-		if (uploadedFile) {
-			file.value = uploadedFile;
-			parseCSVForPreview(uploadedFile);
-		}
-		isDragOver.value = false;
-	}
-
-	function onDragOver(event: DragEvent) {
-		if (!DBstore.globalFileIsUploading) {
-			isDragOver.value = false;
-		}
-	}
-
-	function onDragEnter(event: DragEvent) {
-		if (!DBstore.globalFileIsUploading) {
-			isDragOver.value = true;
-		}
-	}
-
-	function onDragLeave(event: DragEvent) {
-		if (!DBstore.globalFileIsUploading) {
-			isDragOver.value = false;
-		}
 	}
 
 	interface ColumnRolesEvent {
@@ -221,11 +145,77 @@
 		showModal.value = false;
 	}
 
-	function selectFile(): void {
-		const input = fileInput.value;
-		if (input) {
-			input.value = '';
-			input.click();
+	// New reactive properties for file upload state
+	const isUploading = ref(false);
+	const isFileUploaded = ref(false);
+	const uploadProgress = ref(0);
+	const uploadedFileName = ref('');
+
+	// New ref for status message
+	const statusMessage = ref(
+		'Drag and drop your CSV file here, or click to select'
+	);
+
+	// New function to handle file upload
+	async function handleFileUpload(file: File) {
+		isUploading.value = true;
+		statusMessage.value = 'Uploading...';
+		uploadProgress.value = 0;
+
+		try {
+			await uploadFile(file, (progress: number) => {
+				uploadProgress.value = progress;
+			});
+
+			uploadedFileName.value = file.name;
+			isFileUploaded.value = true;
+			emit('fileUploaded', {
+				componentName: props.componentName,
+				fileName: file.name,
+			});
+		} catch (error) {
+			console.error('File upload failed:', error);
+			emit('uploadError', {
+				componentName: props.componentName,
+				error,
+			});
+		} finally {
+			isUploading.value = false;
+		}
+	}
+
+	const emit = defineEmits<{
+		(
+			e: 'fileUploaded',
+			payload: { componentName: string; fileName: string }
+		): void;
+		(
+			e: 'uploadError',
+			payload: { componentName: string; error: unknown }
+		): void;
+		(e: 'fileRemoved', componentName: string): void;
+	}>();
+
+	const { deleteObjectStore } = useIndexedDB();
+
+	async function handleRemoveFile() {
+		if (file.value) {
+			try {
+				// Remove from IndexedDB
+				await deleteObjectStore(DBname.value, file.value.name);
+
+				// Remove from Pinia store
+				DBstore.removeFileNameFilesUploaded(file.value.name);
+
+				// Reset component state
+				resetComponentState();
+
+				// Emit event to parent component
+				emit('fileRemoved', props.componentName);
+			} catch (error) {
+				console.error('Error removing file:', error);
+				// Handle error (e.g., show error message to user)
+			}
 		}
 	}
 </script>
@@ -233,13 +223,6 @@
 <style scoped>
 	.fileLoaded {
 		background-color: hsl(120, 80%, 50%);
-    color: black;
-	}
-	.drop-zone .absolute {
-		transition: width 0.3s ease-in-out;
-	}
-	.drop-zone.no-hover:hover {
-		border-color: inherit; /* Disable hover effect */
-		cursor: not-allowed; /* Optionally change the cursor to indicate disabled state */
+		color: black;
 	}
 </style>
