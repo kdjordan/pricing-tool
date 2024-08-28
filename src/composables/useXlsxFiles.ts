@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import * as XLSX from 'xlsx';
-import { StandardizedData } from '../../types/app-types';
+import { StandardizedData, DBName } from '../../types/app-types';
 import { useDBstate } from '@/stores/dbStore';
 import useIndexedDB from './useIndexDB';
 
@@ -11,7 +11,7 @@ export default function useXLSXProcessing() {
     const file = ref<File | null>(null);
     const startLine = ref<number>(1);
     const columnRoles = ref<string[]>([]);
-    const DBname = ref<string>('');
+    const DBname = ref<DBName>(DBName.AZ); // Initialize with a default value
     const componentName = ref<string>('');
     const previewData = ref<any[][]>([]);
     const columns = ref<string[]>([]);

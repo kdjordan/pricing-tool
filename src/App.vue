@@ -8,104 +8,50 @@
           <router-view />
         </main>
         <TheFooter class="ml-[200px]"/>
-				{{ dbStore }}
       </div>
     </div>
   </div>
 </template>
 
-<script setup>
-	import SideNav from './components/SideNav.vue';
-	import TheHeader from './components/TheHeader.vue';
-	import TheFooter from './components/TheFooter.vue';
-	import { openDB } from 'idb';
-	import { onMounted, onBeforeUnmount } from 'vue';
-	import { useDBstate } from '@/stores/dbStore';
-	import { deleteAllDbsApi } from '@/API/api';
+<script setup lang="ts">
+import { onMounted, onBeforeUnmount } from 'vue';
+import SideNav from './components/SideNav.vue';
+import TheHeader from './components/TheHeader.vue';
+import TheFooter from './components/TheFooter.vue';
+import { initAppWithSampleData } from './utils/initApp';
+import { deleteAllDbsApi } from './API/api'; // Import the existing function
+import { useDBstate } from '@/stores/dbStore'; // Import the store
+import { DBName } from '../types/app-types';
 
-	const dbStore = useDBstate();
+const DBstore = useDBstate(); // Get the store instance
 
-	const dbNames = ['az', 'us', 'can']; // List your database names here
+const cleanupDatabases = () => {
+  const dbsToDelete = Object.values(DBName);
+  deleteAllDbsApi(dbsToDelete);
+};
 
-	const handleBeforeUnload = () => {
-		deleteAllDbsApi(dbNames);
-	};
+onMounted(async () => {
+  try {
+    // Initialize with dummy data and sample DB
+    // First parameter: isPaid (true for paid user, false for free user)
+    // Second parameter: loadSampleDB (true to load sample data, false to skip)
+    await initAppWithSampleData(false, true);
+    console.log('App initialized with sample data');
+    
+    // Add event listener for beforeunload
+    window.addEventListener('beforeunload', cleanupDatabases);
+  } catch (error) {
+    console.error('Error initializing app:', error);
+  }
+});
 
-	onMounted(() => {
-		window.addEventListener('beforeunload', handleBeforeUnload);
-	});
-
-	onBeforeUnmount(() => {
-		window.removeEventListener('beforeunload', handleBeforeUnload);
-	});
-
-	// Function to process CSV text into an array of objects
-	function processData(csvText) {
-		const rows = csvText.trim().split('\n');
-		return rows.map((row, index) => {
-			const [destName, dialCode, rate] = row.split(',');
-			return {
-				destName: destName.trim(),
-				dialCode: Number(dialCode.trim()),
-				rate: Number(rate.trim()),
-			};
-		});
-	}
-
-	async function loadDb() {
-		try {
-			// Open or create the 'az' IndexedDB database
-			const db = await openDB('az', 1, {
-				upgrade(db) {
-					// Create object stores for file1.csv and file2.csv
-					db.createObjectStore('AZtest1.csv', {
-						keyPath: 'id',
-						autoIncrement: true,
-					});
-					db.createObjectStore('AZtest2.csv', {
-						keyPath: 'id',
-						autoIncrement: true,
-					});
-				},
-			});
-
-			// Fetch file1.csv
-			const DBstore = useDBstate();
-			const responseFile1 = await fetch('/src/data/AZtest1.csv');
-			
-			const csvTextFile1 = await responseFile1.text();
-			// console.log('got file 1', csvTextFile1)
-			DBstore.addFileUploaded('az1', 'az', 'AZtest1.csv');
-
-			// Fetch file2.csv
-			const responseFile2 = await fetch('/src/data/AZtest2.csv');
-			const csvTextFile2 = await responseFile2.text();
-			DBstore.addFileUploaded('az2', 'az', 'AZtest2.csv');
-
-			// Process and store file1.csv in IndexedDB 'file1' object store
-			const dataFile1 = processData(csvTextFile1);
-			console.log('sending data1 ', dataFile1)
-			await storeData(db, 'AZtest1.csv', dataFile1);
-
-			// Process and store file2.csv in IndexedDB 'file2' object store
-			const dataFile2 = processData(csvTextFile2);
-			await storeData(db, 'AZtest2.csv', dataFile2);
-		} catch (error) {
-			console.error('Error loading CSV into IndexedDB:', error);
-		}
-	}
-	// Function to store data in the specified object store
-	async function storeData(db, storeName, data) {
-		const tx = db.transaction(storeName, 'readwrite');
-		const store = tx.objectStore(storeName);
-		data.forEach((item) => store.put(item));
-		await tx.done; // Complete the transaction
-	}
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', cleanupDatabases);
+});
 </script>
 
 <style>
-	.aborder {
-		border: 1px solid red;
-	}
-
+.aborder {
+  border: 1px solid red;
+}
 </style>

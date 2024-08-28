@@ -1,11 +1,11 @@
 import { useUserProfileStore } from '../stores/userProfileStore'
 import { useDBstate } from '@/stores/dbStore'
-import { openDB } from 'idb'
+import { openDB, IDBPDatabase } from 'idb'
 import { DBName, StandardizedData } from '../../types/app-types'
 
 async function loadDB() {
   try {
-    const db = await openDB('az', 1, {
+    const db = await openDB<StandardizedData>('az', 1, {
       upgrade(db) {
         db.createObjectStore('AZtest1.csv', { keyPath: 'id', autoIncrement: true })
         db.createObjectStore('AZtest2.csv', { keyPath: 'id', autoIncrement: true })
@@ -14,24 +14,23 @@ async function loadDB() {
 
     const DBstore = useDBstate()
 
-    // Load AZtest1.csv
-    const responseFile1 = await fetch('/src/data/AZtest1.csv')
-    const csvTextFile1 = await responseFile1.text()
-    DBstore.addFileUploaded('az1', DBName.AZ, 'AZtest1.csv')
+    // Load and process AZtest1.csv
+    await loadAndProcessFile(db, DBstore, 'az1', 'AZtest1.csv')
 
-    // Load AZtest2.csv
-    const responseFile2 = await fetch('/src/data/AZtest2.csv')
-    const csvTextFile2 = await responseFile2.text()
-    DBstore.addFileUploaded('az2', DBName.AZ, 'AZtest2.csv')
-
-    // Process and store data
-    await storeData(db, 'AZtest1.csv', processData(csvTextFile1))
-    await storeData(db, 'AZtest2.csv', processData(csvTextFile2))
+    // Load and process AZtest2.csv
+    await loadAndProcessFile(db, DBstore, 'az2', 'AZtest2.csv')
 
     console.log('Sample data loaded into IndexedDB')
   } catch (error) {
     console.error('Error loading sample data into IndexedDB:', error)
   }
+}
+
+async function loadAndProcessFile(db: IDBPDatabase<StandardizedData>, DBstore: any, fileId: string, fileName: string) {
+  const response = await fetch(`/src/data/${fileName}`)
+  const csvText = await response.text()
+  DBstore.addFileUploaded(fileId, DBName.AZ, fileName)
+  await storeData(db, fileName, processData(csvText))
 }
 
 function processData(csvText: string): StandardizedData[] {
