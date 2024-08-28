@@ -22,5 +22,14 @@ export const useUserProfileStore = defineStore('userProfile', {
         this.profile.subscriptionType = type
       }
     },
+    // Add this new action
+    setupDummyProfile(isPaid: boolean = false) {
+      this.profile = {
+        id: 'dummy-id',
+        name: isPaid ? 'Paid User' : 'Free User',
+        email: isPaid ? 'paid@example.com' : 'free@example.com',
+        subscriptionType: isPaid ? 'paid' : 'free',
+      }
+    },
   },
 })
