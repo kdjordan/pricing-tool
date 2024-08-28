@@ -74,3 +74,12 @@ export type FileUpload = {
 };
 
 export type UploadedFileTracker = Map<string, FileUpload>;
+
+// Add the new UserProfile interface
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  subscriptionType: 'free' | 'paid';
+  // Add any other relevant user information
+}
