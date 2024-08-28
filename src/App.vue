@@ -10,11 +10,12 @@
         <TheFooter class="ml-[200px]"/>
       </div>
     </div>
+    <span class="ml-[300px]">{{ userProfileInfo }}</span> 
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue';
+import { onMounted, onBeforeUnmount, computed } from 'vue';
 import SideNav from './components/SideNav.vue';
 import TheHeader from './components/TheHeader.vue';
 import TheFooter from './components/TheFooter.vue';
@@ -22,8 +23,18 @@ import { initAppWithSampleData } from './utils/initApp';
 import { deleteAllDbsApi } from './API/api'; // Import the existing function
 import { useDBstate } from '@/stores/dbStore'; // Import the store
 import { DBName } from '../types/app-types';
+import { useUserProfileStore } from './stores/userProfileStore';
 
 const DBstore = useDBstate(); // Get the store instance
+const userProfileStore = useUserProfileStore();
+
+const userProfileInfo = computed(() => {
+  if (userProfileStore.isLoggedIn) {
+    return `Logged in as ${userProfileStore.profile?.name} (${userProfileStore.profile?.subscriptionType} user)`;
+  } else {
+    return 'Not logged in';
+  }
+});
 
 const cleanupDatabases = () => {
   const dbsToDelete = Object.values(DBName);
