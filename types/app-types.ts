@@ -1,3 +1,17 @@
+export enum Feature {
+  XLSX_SUPPORT = 'xlsxSupport',
+  ADVANCED_ANALYTICS = 'advancedAnalytics',
+  BULK_PROCESSING = 'bulkProcessing',
+  // Add more features as needed
+}
+
+export interface FeatureFlags {
+  [Feature.XLSX_SUPPORT]: boolean;
+  [Feature.ADVANCED_ANALYTICS]: boolean;
+  [Feature.BULK_PROCESSING]: boolean;
+  // Add more feature flags as needed
+}
+
 export enum AZColumnRole {
   Destination = 'destName',
   DialCode = 'dialCode',

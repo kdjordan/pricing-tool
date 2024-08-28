@@ -83,6 +83,7 @@
 	import { ref, watch, computed } from 'vue';
 	import useCSVProcessing from '../composables/useCsvFilesFunctions';
 	import { useDBstate } from '@/stores/dbStore';
+	import { useFeatureAccess } from '../composables/useFeatureAccess';
 
 	// Component props
 	const props = defineProps<{
@@ -244,6 +245,10 @@
 	const highlightedWord = computed(() => {
 		return props.typeOfComponent === 'owner' ? 'YOUR' : 'CARRIER';
 	});
+
+	const { canUseXlsx } = useFeatureAccess();
+
+	// Use canUseXlsx.value to conditionally render or enable XLSX-related features
 </script>
 
 <style scoped>

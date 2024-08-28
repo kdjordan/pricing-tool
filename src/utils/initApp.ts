@@ -1,7 +1,7 @@
-import { DBName, StandardizedData } from '../../types/app-types'
 import { useUserProfileStore } from '../stores/userProfileStore'
 import { useDBstate } from '@/stores/dbStore'
 import { openDB } from 'idb'
+import { DBName, StandardizedData } from '../../types/app-types'
 
 async function loadDB() {
   try {
@@ -34,7 +34,7 @@ async function loadDB() {
   }
 }
 
-function processData(csvText: string) {
+function processData(csvText: string): StandardizedData[] {
   const rows = csvText.trim().split('\n')
   return rows.map((row) => {
     const [destName, dialCode, rate] = row.split(',')
@@ -46,7 +46,7 @@ function processData(csvText: string) {
   })
 }
 
-async function storeData(db: any, storeName: string, data: any[]) {
+async function storeData(db: any, storeName: string, data: StandardizedData[]) {
   const tx = db.transaction(storeName, 'readwrite')
   const store = tx.objectStore(storeName)
   data.forEach((item) => store.put(item))
