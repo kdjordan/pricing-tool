@@ -19,6 +19,13 @@ export enum AZColumnRole {
   SelectRole = '' // This will represent our "Select Column Role" option
 }
 
+export enum USColumnRole {
+  NPA = 'npa',
+  NXX = 'nxx',
+  Rate = 'rate',
+  SelectRole = '' // This will represent our "Select Column Role" option
+}
+
 export enum DBName {
   AZ = 'az',
   US = 'us',

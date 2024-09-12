@@ -10,7 +10,7 @@
       <div class="flex justify-center space-x-6 flex-grow h-full">
         <UploadComponent
           typeOfComponent="owner"
-          DBname="az"
+          :DBname="DBName.AZ"
           :componentName="component1"
           :disabled="dbStore.isComponentDisabled('az1')"
           :columnRoleOptions="columnRoleOptions"
@@ -19,7 +19,7 @@
 
         <UploadComponent
           typeOfComponent="client"
-          DBname="az"
+          :DBname="DBName.AZ"
           :componentName="component2"
           :disabled="dbStore.isComponentDisabled('az2')"
           :columnRoleOptions="columnRoleOptions"
@@ -72,7 +72,7 @@ const component2 = ref<string>('az2');
 const isGeneratingReport = ref<boolean>(false);
 const report = ref<ComparisonReport | null>(null);
 
-const columnRoleOptions = [
+const columnRoleOptions: { value: AZColumnRole; label: string; }[] = [
   { value: AZColumnRole.Destination, label: 'Destination Name' },
   { value: AZColumnRole.DialCode, label: 'Dial Code' },
   { value: AZColumnRole.Rate, label: 'Rate' },

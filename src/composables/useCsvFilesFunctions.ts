@@ -3,6 +3,9 @@ import Papa from 'papaparse';
 import {
 	type StandardizedData,
 	type ParsedResults,
+	DBName, // Import DBName enum
+	AZColumnRole,
+	USColumnRole
 } from '../../types/app-types';
 import { useDBstate } from '@/stores/dbStore';
 import useIndexedDB from './useIndexDB';
@@ -13,12 +16,12 @@ const { storeInIndexedDB, deleteObjectStore } =
 const DBstore = useDBstate();
 
 
-export default function useCSVProcessing() {
+export default function useCSVProcessing(initialDBName: DBName) {
+	const DBname = ref<DBName>(initialDBName);
 	const file = ref<File | null>(null);
 	const startLine = ref<number>(1); // Adjust default start line if needed
-	const columnRoles = ref<string[]>([]); // Ensure columnRoles is properly defined
-	const DBname = ref<string>('')
-	const componentName = ref<string>('')
+	const columnRoles = ref<(AZColumnRole | USColumnRole)[]>([]); // Ensure columnRoles is properly defined
+	const componentName = ref<string>('');
 	const previewData = ref<string[][]>([]);
 	const columns = ref<string[]>([]);
 	const showModal = ref<boolean>(false);
@@ -49,21 +52,34 @@ export default function useCSVProcessing() {
 
 							columnRoles.value.forEach((role, index) => {
 								if (role) {
-									switch (role) {
-										case 'destName':
-											standardizedRow.destName = row[index];
-											break;
-										case 'dialCode':
-											standardizedRow.dialCode = parseFloat(row[index]);
-											break;
-										case 'rate':
-											standardizedRow.rate = parseFloat(row[index]);
-											break;
-										default:
-											standardizedRow[role] = row[index];
+									if (DBname.value === DBName.AZ) {
+										switch (role as AZColumnRole) {
+											case AZColumnRole.Destination:
+												standardizedRow.destName = row[index];
+												break;
+											case AZColumnRole.DialCode:
+												standardizedRow.dialCode = parseFloat(row[index]);
+												break;
+											case AZColumnRole.Rate:
+												standardizedRow.rate = parseFloat(row[index]);
+												break;
+										}
+									} else if (DBname.value === DBName.US) {
+										switch (role as USColumnRole) {
+											case USColumnRole.NPA:
+												standardizedRow.destName = row[index]; // Use NPA as destName
+												break;
+											case USColumnRole.NXX:
+												standardizedRow.dialCode = parseFloat(row[index]); // Use NXX as dialCode
+												break;
+											case USColumnRole.Rate:
+												standardizedRow.rate = parseFloat(row[index]);
+												break;
+										}
 									}
 								}
 							});
+
 							// Validate destName is a string
 							
 							const isValidDestName = typeof standardizedRow.destName === 'string' && standardizedRow.destName.length > 0;
@@ -118,11 +134,13 @@ export default function useCSVProcessing() {
 	//function reaches out to IndesBB composable to store data
 	async function storeDataInIndexedDB(data: StandardizedData[]) {	
 		console.log('storing with ', DBname.value, componentName.value)
+		// Instead of reassigning, let's use a local variable
+		const dbNameToUse = DBname.value === DBName.AZ ? DBName.AZ : DBName.US;
 		try {
 			if (file.value) {
 				await storeInIndexedDB(
 					data,
-					DBname.value,
+					dbNameToUse,
 					file.value.name,
 					componentName.value
 				);

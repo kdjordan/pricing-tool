@@ -78,20 +78,21 @@
 
 <script setup lang="ts">
 	import TheModal from './TheModal.vue';
-	import { AZColumnRole } from '../../types/app-types';
+	import { AZColumnRole, USColumnRole, DBName } from '../../types/app-types';
 	import UploadIcon from './UploadIcon.vue';
 	import { ref, watch, computed } from 'vue';
 	import useCSVProcessing from '../composables/useCsvFilesFunctions';
 	import { useDBstate } from '@/stores/dbStore';
 	import { useFeatureAccess } from '../composables/useFeatureAccess';
 
+
 	// Component props
 	const props = defineProps<{
 		typeOfComponent: string;
-		DBname: string;
+		DBname: DBName;
 		componentName: string;
 		disabled: boolean;
-		columnRoleOptions: { value: AZColumnRole; label: string }[];
+		columnRoleOptions: { value: AZColumnRole | USColumnRole; label: string }[];
 	}>();
 
 	// Extract functions and reactive properties from useCSVProcessing composable
@@ -107,7 +108,7 @@
 		parseCSVForFullProcessing,
 		parseCSVForPreview,
 		removeFromDB,
-	} = useCSVProcessing();
+	} = useCSVProcessing(props.DBname);
 
 	// Define reactive properties
 	const fileInput = ref<HTMLInputElement | null>(null);
@@ -223,7 +224,13 @@
 
 	async function confirmColumnRoles(event: ColumnRolesEvent) {
 		showModal.value = false;
-		columnRoles.value = event.columnRoles;
+		columnRoles.value = event.columnRoles.map(role => {
+			if (props.DBname === DBName.AZ) {
+				return role as AZColumnRole;
+			} else {
+				return role as USColumnRole;
+			}
+		});
 		startLine.value = event.startLine;
 		await parseCSVForFullProcessing();
 	}
