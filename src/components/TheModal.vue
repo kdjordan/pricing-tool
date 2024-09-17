@@ -211,6 +211,7 @@
 	}
 
 	function cancelModal() {
+		console.log('Cancel button clicked in modal');
 		emit('cancel');
 	}
 </script>

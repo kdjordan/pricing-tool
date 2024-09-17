@@ -1,0 +1,59 @@
+# Vue 3 and Tailwind-specific rules
+language: vue
+framework: vue3
+styling: tailwind
+
+# General coding principles
+principles:
+  - Write clear, concise code
+  - Adhere to Vue 3 and Tailwind best practices
+  - Implement incremental changes
+  - Consider potential side effects
+  - Be aware of installed packages in package.json
+
+# Specific rules
+rules:
+  - Prefer composition API over options API
+  - Use script setup syntax when appropriate
+  - Utilize Vue 3 reactivity system (ref, reactive, computed)
+  - Implement proper component structure and naming conventions
+  - Optimize performance with Vue 3 features (e.g., v-memo, Suspense)
+  - Use Tailwind utility classes for styling
+  - Avoid inline styles unless necessary
+  - Implement proper state management (Pinia preferred over Vuex)
+  - Use async/await for asynchronous operations
+  - Implement proper error handling and logging
+  - Ensure proper typing with TypeScript when used
+  - Utilize Vue 3 Teleport for modals and popups
+  - Implement accessibility features (ARIA attributes, semantic HTML)
+
+# Refactoring guidelines
+refactoring:
+  - Suggest incremental improvements
+  - Identify and address potential side effects
+  - Consider impact on existing functionality
+  - Optimize for readability and maintainability
+  - Ensure backward compatibility when possible
+
+# Package awareness
+packages:
+  - Verify compatibility with Vue 3 and Tailwind
+  - Suggest alternatives for deprecated or incompatible packages
+  - Recommend removal of unused packages
+  - Propose new packages only when significant benefits are evident
+
+# Code quality
+quality:
+  - Implement proper unit and integration testing
+  - Ensure consistent code formatting (use Prettier or ESLint)
+  - Maintain appropriate component granularity
+  - Optimize imports and remove unused code
+  - Use meaningful variable and function names
+
+# Performance
+performance:
+  - Implement lazy loading for routes and components
+  - Optimize rendering with v-once and v-memo when appropriate
+  - Minimize unnecessary re-renders
+  - Implement proper caching strategies
+  - Optimize asset loading and management

@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, Ref, watch } from 'vue';
 import * as XLSX from 'xlsx';
 import { DBName, AZColumnRole, USColumnRole } from '../../types/app-types';
 import { useDBstate } from '@/stores/dbStore';
@@ -6,59 +6,64 @@ import { useDBstate } from '@/stores/dbStore';
 const DBstore = useDBstate();
 
 export default function useXLSXProcessing(initialDBName: DBName) {
-    const DBname = ref<DBName>(initialDBName);
-    const file = ref<File | null>(null);
-    const startLine = ref<number>(1);
-    const columnRoles = ref<(AZColumnRole | USColumnRole)[]>([]);
-    const componentName = ref<string>('');
-    const previewData = ref<string[][]>([]);
-    const columns = ref<string[]>([]);
-    const showModal = ref<boolean>(false);
+    const DBname: Ref<DBName> = ref(initialDBName);
+    const file: Ref<File | null> = ref(null);
+    const startLine: Ref<number> = ref(1);
+    const columnRoles: Ref<(AZColumnRole | USColumnRole)[]> = ref([]);
+    const componentName: Ref<string> = ref('');
+    const previewData: Ref<string[][]> = ref([]);
+    const columns: Ref<string[]> = ref([]);
+    const showModal: Ref<boolean> = ref(false);
 
-    function parseXLSXForPreview(uploadedFile: File) {
-        const reader = new FileReader();
-        reader.onload = (e: ProgressEvent<FileReader>) => {
-            const data = new Uint8Array(e.target?.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
+    const parseXLSXForPreview = async (file: File) => {
+        console.log('Parsing XLSX file:', file.name);
+        
+        try {
+            // Your existing XLSX parsing logic here
+            // ...
 
-            previewData.value = jsonData.slice(0, 25);
-            columns.value = jsonData[startLine.value - 1] as string[];
-            columnRoles.value = Array(columns.value.length).fill('');
-            showModal.value = true;
-        };
-        reader.readAsArrayBuffer(uploadedFile);
+            console.log('Parsed XLSX data:', previewData.value);
+            console.log('Parsed XLSX columns:', columns.value);
+        } catch (error) {
+            console.error('Error parsing XLSX file:', error);
+        }
     }
 
-    async function parseXLSXForFullProcessing(): Promise<void> {
-        if (!file.value) return;
+    watch(showModal, (newValue) => {
+        console.log('showModal changed in useXlsxFiles:', newValue);
+    });
 
-        const fileNameExists = DBstore.checkFileNameAvailable(file.value.name);
-        if (fileNameExists) {
-            console.log('File with this name already exists.');
+    async function parseXLSXForFullProcessing(): Promise<void> {
+        if (!file.value) {
+            console.error('No file to process');
             return;
         }
 
-        DBstore.setComponentFileIsUploading(componentName.value);
-        try {
-            const data = await file.value.arrayBuffer();
-            const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
+        const arrayBuffer = await file.value.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
 
-            const dataStartIndex = startLine.value - 1;
-            const fullData = jsonData.slice(dataStartIndex);
-            
-            // Process the data similar to how you do with CSV
-            // This part will depend on your specific requirements
-            // const standardizedData = processXLSXData(fullData);
-            // await storeDataInIndexedDB(standardizedData);
-        } catch (error) {
-            console.error('Error during XLSX parsing', error);
-        }
+        // Process the data based on columnRoles and startLine
+        const processedData = jsonData.slice(startLine.value - 1).map(row => {
+            return columnRoles.value.map(role => {
+                const index = columns.value.indexOf(role);
+                return index !== -1 ? row[index] : '';
+            });
+        });
+
+        // Here you would typically save the processed data or emit an event with the data
+        console.log('Processed XLSX data:', processedData);
+
+        // Reset the state
+        showModal.value = false;
+        file.value = null;
+        previewData.value = [];
+        columns.value = [];
+        columnRoles.value = [];
+        startLine.value = 1;
     }
 
     // You'll need to implement these functions based on your specific requirements

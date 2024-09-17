@@ -46,7 +46,7 @@ onMounted(async () => {
     // Initialize with dummy data and sample DB
     // First parameter: isPaid (true for paid user, false for free user)
     // Second parameter: loadSampleDB (true to load sample data, false to skip)
-    await initAppWithSampleData(false, false);
+    await initAppWithSampleData(true, true);
     console.log('App initialized with sample data');
     
     // Add event listener for beforeunload

@@ -113,9 +113,9 @@ export default function useCSVProcessing(initialDBName: DBName) {
 	}
 
 
-	function parseCSVForPreview(uploadedFile: File) {
+	const parseCSVForPreview = async (file: File) => {
 		try {
-			Papa.parse(uploadedFile, {
+			Papa.parse(file, {
 				header: false,
 				complete(results) {
 					previewData.value = results.data.slice(0, 25) as string[][];
@@ -129,7 +129,7 @@ export default function useCSVProcessing(initialDBName: DBName) {
 		} catch {
 			console.error('error uploading file');
 		}
-	}
+	};
 
 	//function reaches out to IndesBB composable to store data
 	async function storeDataInIndexedDB(data: StandardizedData[]) {	

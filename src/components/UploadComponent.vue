@@ -63,21 +63,21 @@
 		</div>
 		<!-- Column Roles Modal -->
 		<TheModal
-			v-show="showModal"
-			 :showModal="showModal"
-			:columns="columns"
-			:previewData="previewData"
-			:columnRoles="columnRoles"
-			:startLine="startLine"
+			v-if="isModalVisible"
+			:showModal="isModalVisible"
+			:columns="modalColumns"
+			:previewData="modalPreviewData"
+			:columnRoles="modalColumnRoles"
+			:startLine="modalStartLineValue"
 			@confirm="confirmColumnRoles"
 			@cancel="cancelModal"
-			:columnRoleOptions="columnRoleOptions"
+			:columnRoleOptions="props.columnRoleOptions"
 		/>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, computed, watch, ComputedRef } from 'vue';
 import { AZColumnRole, USColumnRole, DBName } from '../../types/app-types';
 import UploadIcon from './UploadIcon.vue';
 import TheModal from './TheModal.vue';
@@ -97,23 +97,28 @@ const props = defineProps<{
 
 // Initialize CSV and XLSX processors
 const csvProcessor = useCSVProcessing(props.DBname);
-const xlsxProcessor = useXLSXProcessing(props.DBname);
+const { 
+    showModal, 
+    parseXLSXForPreview, 
+    parseXLSXForFullProcessing, 
+    file, 
+    startLine, 
+    columnRoles, 
+    previewData, 
+    columns 
+} = useXLSXProcessing(props.DBname);
 
 // Extract common reactive properties
 const {
-  file,
-  startLine,
-  columnRoles,
-  columns,
-  showModal,
-  previewData,
-  componentName,
-  removeFromDB,
+  columns: csvColumns,
+  previewData: csvPreviewData,
+  columnRoles: csvColumnRoles,
+  showModal: csvShowModal,
 } = csvProcessor;
 
 // Set DB name and component name from props
 const DBstore = useDBstate();
-componentName.value = props.componentName;
+csvProcessor.componentName.value = props.componentName;
 
 // Feature access
 const { canUseXlsx } = useFeatureAccess();
@@ -166,47 +171,92 @@ if (DBstore.getStoreNameByComponent(props.componentName)) {
   updateDisplayMessage('complete');
 }
 
-function handleFileUpload(event: Event) {
+const modalColumns = computed(() => {
+  console.log('Computing modalColumns', file.value?.name, columns.value, csvColumns.value);
+  return file.value?.name.endsWith('.xlsx') ? columns.value : csvColumns.value;
+});
+
+const modalPreviewData = computed(() => {
+  console.log('Computing modalPreviewData', file.value?.name, previewData.value, csvPreviewData.value);
+  return file.value?.name.endsWith('.xlsx') ? previewData.value : csvPreviewData.value;
+});
+
+const modalColumnRoles = computed(() => file.value?.name.endsWith('.xlsx') ? columnRoles.value : csvColumnRoles.value);
+const modalStartLine = computed(() => file.value?.name.endsWith('.xlsx') ? startLine.value : csvProcessor.startLine);
+
+const modalStartLineValue = computed(() => {
+  const line = modalStartLine.value;
+  return typeof line === 'number' ? line : line.value;
+});
+
+const isModalVisible: ComputedRef<boolean> = computed(() => {
+  console.log('Computing isModalVisible, showModal.value:', showModal.value, 'csvShowModal.value:', csvShowModal.value);
+  return showModal.value || csvShowModal.value;
+});
+
+async function handleFileUpload(event: Event): Promise<void> {
   const target = event.target as HTMLInputElement;
   if (target && target.files && target.files.length > 0) {
     const uploadedFile = target.files[0];
     if (uploadedFile) {
       file.value = uploadedFile;
-      if (uploadedFile.name.endsWith('.xlsx') && canUseXlsx.value) {
-        xlsxProcessor.parseXLSXForPreview(uploadedFile);
-      } else {
-        csvProcessor.parseCSVForPreview(uploadedFile);
+      console.log('File uploaded:', file.value.name);
+      try {
+        if (file.value.name.toLowerCase().endsWith('.xlsx') && canUseXlsx.value) {
+          console.log('XLSX file detected');
+          await parseXLSXForPreview(file.value);
+        } else {
+          console.log('CSV file detected');
+          await csvProcessor.parseCSVForPreview(file.value);
+        }
+        console.log('Preview data:', modalPreviewData.value);
+        console.log('Columns:', modalColumns.value);
+        showModal.value = true;
+      } catch (error) {
+        console.error('Error processing file:', error);
+        // Handle error (e.g., show an error message to the user)
       }
     }
   }
 }
 
+async function onDrop(event: DragEvent): Promise<void> {
+  const uploadedFile = event.dataTransfer?.files[0] ?? null;
+  if (uploadedFile) {
+    file.value = uploadedFile;
+    console.log('File dropped:', file.value.name);
+    try {
+      if (file.value.name.toLowerCase().endsWith('.xlsx') && canUseXlsx.value) {
+        console.log('XLSX file dropped');
+        await parseXLSXForPreview(file.value);
+      } else {
+        console.log('CSV file dropped');
+        await csvProcessor.parseCSVForPreview(file.value);
+      }
+      console.log('Preview data:', modalPreviewData.value);
+      console.log('Columns:', modalColumns.value);
+      showModal.value = true;
+    } catch (error) {
+      console.error('Error processing dropped file:', error);
+      // Handle error (e.g., show an error message to the user)
+    }
+    isDragOver.value = false;
+  }
+}
+
 function dumpFile() {
-  removeFromDB();
+  csvProcessor.removeFromDB();
   resetLocalState();
 }
 
 function resetLocalState() {
   file.value = null;
   fileInput.value = null;
-  columns.value = [];
-  previewData.value = [];
-  columnRoles.value = [];
+  csvColumns.value = [];
+  csvPreviewData.value = [];
+  csvColumnRoles.value = [];
   statusMessage.value = 'Drag file here or click to load.';
   updateDisplayMessage(props.typeOfComponent);
-}
-
-function onDrop(event: DragEvent) {
-  const uploadedFile = event.dataTransfer?.files[0] ?? null;
-  if (uploadedFile) {
-    file.value = uploadedFile;
-    if (uploadedFile.name.endsWith('.xlsx') && canUseXlsx.value) {
-      xlsxProcessor.parseXLSXForPreview(uploadedFile);
-    } else {
-      csvProcessor.parseCSVForPreview(uploadedFile);
-    }
-  }
-  isDragOver.value = false;
 }
 
 function onDragOver(event: DragEvent) {
@@ -231,6 +281,7 @@ interface ColumnRolesEvent {
 }
 
 async function confirmColumnRoles(event: ColumnRolesEvent) {
+  console.log('confirmColumnRoles called');
   showModal.value = false;
   columnRoles.value = event.columnRoles.map(role => {
     if (props.DBname === DBName.AZ) {
@@ -241,14 +292,37 @@ async function confirmColumnRoles(event: ColumnRolesEvent) {
   });
   startLine.value = event.startLine;
   if (file.value?.name.endsWith('.xlsx') && canUseXlsx.value) {
-    await xlsxProcessor.parseXLSXForFullProcessing();
+    await parseXLSXForFullProcessing();
   } else {
     await csvProcessor.parseCSVForFullProcessing();
   }
 }
 
 function cancelModal() {
+  console.log('cancelModal called in UploadComponent');
   showModal.value = false;
+  csvShowModal.value = false;
+  
+  if (!file.value) {
+    console.log('No file to cancel');
+    return;
+  }
+
+  const isXlsxFile = file.value.name.endsWith('.xlsx');
+  file.value = null;
+
+  if (isXlsxFile) {
+    previewData.value = [];
+    columns.value = [];
+    columnRoles.value = [];
+    startLine.value = 1;
+  } else {
+    csvProcessor.columns.value = [];
+    csvProcessor.previewData.value = [];
+    csvProcessor.columnRoles.value = [];
+    csvProcessor.startLine.value = 1;
+  }
+  // Reset any other necessary state
 }
 
 function selectFile(): void {
@@ -263,6 +337,19 @@ function selectFile(): void {
 
 const highlightedWord = computed(() => {
   return props.typeOfComponent === 'owner' ? 'YOUR' : 'CARRIER';
+});
+
+// Near the top of your script section, after initializing canUseXlsx
+console.log('Initial canUseXlsx value:', canUseXlsx.value);
+
+// If canUseXlsx is reactive, you might want to watch it
+watch(canUseXlsx, (newValue) => {
+  console.log('canUseXlsx changed to:', newValue);
+});
+
+// Add this watch as well
+watch(showModal, (newValue) => {
+  console.log('showModal changed in UploadComponent:', newValue);
 });
 </script>
 
