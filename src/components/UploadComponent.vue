@@ -14,14 +14,15 @@
 							props.componentName
 						),
 						'bg-success text-background': props.disabled,
-						'hover:bg-muted cursor-pointer': !props.disabled,
-            'cursor-not-allowed': props.disabled || DBstore.globalFileIsUploading
+						'hover:bg-muted cursor-pointer': !props.disabled && !isDragOver,
+						'cursor-not-allowed': props.disabled || DBstore.globalFileIsUploading,
+						'bg-muted': isDragOver && !props.disabled, // Add this line
 					},
 				]"
 				@dragover.prevent="onDragOver"
 				@drop.prevent="onDrop"
-				@dragenter="onDragEnter"
-				@dragleave="onDragLeave"
+				@dragenter.prevent="onDragEnter"
+				@dragleave.prevent="onDragLeave"
 				@click="selectFile"
 			>
 				<div class="flex flex-col items-center gap-10 py-10 text-foreground">
@@ -44,7 +45,7 @@
 
 				<input
 					type="file"
-					@change="handleFileUpload"
+					@change="handleFileUploadEvent"
 					accept=".csv, .xlsx"
 					hidden
 					:disabled="props.disabled || DBstore.globalFileIsUploading"
@@ -68,23 +69,20 @@
 			:columns="modalColumns"
 			:previewData="modalPreviewData"
 			:columnRoles="modalColumnRoles"
-			:startLine="modalStartLineValue"
-			@confirm="confirmColumnRoles"
-			@cancel="cancelModal"
+			:startLine="modalStartLine"
 			:columnRoleOptions="props.columnRoleOptions"
-		/>
+			@confirm="onConfirm"
+			@cancel="onCancel"
+			/>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, ComputedRef } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { AZColumnRole, USColumnRole, DBName } from '../../types/app-types';
 import UploadIcon from './UploadIcon.vue';
 import TheModal from './TheModal.vue';
-import useCSVProcessing from '../composables/useCsvFilesFunctions';
-import useXLSXProcessing from '../composables/useXlsxFiles';
-import { useDBstate } from '@/stores/dbStore';
-import { useFeatureAccess } from '../composables/useFeatureAccess';
+import { useFileUpload, FileProcessor } from '../composables/useFileUpload';
 
 // Component props
 const props = defineProps<{
@@ -95,39 +93,30 @@ const props = defineProps<{
   columnRoleOptions: { value: AZColumnRole | USColumnRole; label: string }[];
 }>();
 
-// Initialize CSV and XLSX processors
-const csvProcessor = useCSVProcessing(props.DBname);
-const { 
-    showModal, 
-    parseXLSXForPreview, 
-    parseXLSXForFullProcessing, 
-    file, 
-    startLine, 
-    columnRoles, 
-    previewData, 
-    columns 
-} = useXLSXProcessing(props.DBname);
-
-// Extract common reactive properties
 const {
-  columns: csvColumns,
-  previewData: csvPreviewData,
-  columnRoles: csvColumnRoles,
-  showModal: csvShowModal,
-} = csvProcessor;
+  file,
+  handleFileUpload,
+  resetFileState,
+  showModal,
+  fileProcessor,
+  DBstore,
+  canUseXlsx  // Add this line
+} = useFileUpload(props.DBname, props.componentName);
 
-// Set DB name and component name from props
-const DBstore = useDBstate();
-csvProcessor.componentName.value = props.componentName;
+// Instead, use fileProcessor directly
+const modalColumns = computed(() => fileProcessor.columns.value);
+const modalPreviewData = computed(() => fileProcessor.previewData.value);
+const modalColumnRoles = computed(() => fileProcessor.columnRoles.value);
+const modalStartLine = computed(() => fileProcessor.startLine.value);
 
-// Feature access
-const { canUseXlsx } = useFeatureAccess();
+const isModalVisible = computed(() => showModal.value);
 
 // Define reactive properties
 const fileInput = ref<HTMLInputElement | null>(null);
 const isDragOver = ref<boolean>(false);
 const statusMessage = ref<string>('Drag file or click to upload');
 const displayMessage = ref<string>('');
+
 
 // Setup displayMessage based on componentType prop
 const updateDisplayMessage = (type: string) => {
@@ -171,107 +160,63 @@ if (DBstore.getStoreNameByComponent(props.componentName)) {
   updateDisplayMessage('complete');
 }
 
-const modalColumns = computed(() => {
-  console.log('Computing modalColumns', file.value?.name, columns.value, csvColumns.value);
-  return file.value?.name.endsWith('.xlsx') ? columns.value : csvColumns.value;
-});
-
-const modalPreviewData = computed(() => {
-  console.log('Computing modalPreviewData', file.value?.name, previewData.value, csvPreviewData.value);
-  return file.value?.name.endsWith('.xlsx') ? previewData.value : csvPreviewData.value;
-});
-
-const modalColumnRoles = computed(() => file.value?.name.endsWith('.xlsx') ? columnRoles.value : csvColumnRoles.value);
-const modalStartLine = computed(() => file.value?.name.endsWith('.xlsx') ? startLine.value : csvProcessor.startLine);
-
 const modalStartLineValue = computed(() => {
   const line = modalStartLine.value;
   return typeof line === 'number' ? line : line.value;
 });
 
-const isModalVisible: ComputedRef<boolean> = computed(() => {
-  console.log('Computing isModalVisible, showModal.value:', showModal.value, 'csvShowModal.value:', csvShowModal.value);
-  return showModal.value || csvShowModal.value;
+// Near the top of your script section, after initializing canUseXlsx
+console.log('Initial canUseXlsx value:', canUseXlsx.value);
+
+// If canUseXlsx is reactive, you might want to watch it
+watch(canUseXlsx, (newValue) => {
+  console.log('canUseXlsx changed to:', newValue);
 });
 
-async function handleFileUpload(event: Event): Promise<void> {
+// Add this watch as well
+watch(showModal, (newValue) => {
+  console.log('showModal changed in UploadComponent:', newValue);
+});
+
+async function handleFileUploadEvent(event: Event): Promise<void> {
   const target = event.target as HTMLInputElement;
   if (target && target.files && target.files.length > 0) {
-    const uploadedFile = target.files[0];
-    if (uploadedFile) {
-      file.value = uploadedFile;
-      console.log('File uploaded:', file.value.name);
-      try {
-        if (file.value.name.toLowerCase().endsWith('.xlsx') && canUseXlsx.value) {
-          console.log('XLSX file detected');
-          await parseXLSXForPreview(file.value);
-        } else {
-          console.log('CSV file detected');
-          await csvProcessor.parseCSVForPreview(file.value);
-        }
-        console.log('Preview data:', modalPreviewData.value);
-        console.log('Columns:', modalColumns.value);
-        showModal.value = true;
-      } catch (error) {
-        console.error('Error processing file:', error);
-        // Handle error (e.g., show an error message to the user)
-      }
-    }
+    await handleFileUpload(target.files[0]);
   }
 }
 
 async function onDrop(event: DragEvent): Promise<void> {
-  const uploadedFile = event.dataTransfer?.files[0] ?? null;
-  if (uploadedFile) {
-    file.value = uploadedFile;
-    console.log('File dropped:', file.value.name);
-    try {
-      if (file.value.name.toLowerCase().endsWith('.xlsx') && canUseXlsx.value) {
-        console.log('XLSX file dropped');
-        await parseXLSXForPreview(file.value);
-      } else {
-        console.log('CSV file dropped');
-        await csvProcessor.parseCSVForPreview(file.value);
-      }
-      console.log('Preview data:', modalPreviewData.value);
-      console.log('Columns:', modalColumns.value);
-      showModal.value = true;
-    } catch (error) {
-      console.error('Error processing dropped file:', error);
-      // Handle error (e.g., show an error message to the user)
+  event.preventDefault();
+  isDragOver.value = false;
+  if (!props.disabled && !DBstore.globalFileIsUploading) {
+    const uploadedFile = event.dataTransfer?.files[0] ?? null;
+    if (uploadedFile) {
+      await handleFileUpload(uploadedFile);
     }
-    isDragOver.value = false;
   }
 }
 
 function dumpFile() {
-  csvProcessor.removeFromDB();
-  resetLocalState();
-}
-
-function resetLocalState() {
-  file.value = null;
-  fileInput.value = null;
-  csvColumns.value = [];
-  csvPreviewData.value = [];
-  csvColumnRoles.value = [];
-  statusMessage.value = 'Drag file here or click to load.';
-  updateDisplayMessage(props.typeOfComponent);
+  fileProcessor.removeFromDB(); // Update this line if removeFromDB is a method of fileProcessor
+  resetFileState();
 }
 
 function onDragOver(event: DragEvent) {
-  if (!props.disabled) {
+  event.preventDefault();
+  if (!props.disabled && !DBstore.globalFileIsUploading) {
     isDragOver.value = true;
   }
 }
 
 function onDragEnter(event: DragEvent) {
-  if (!props.disabled) {
+  event.preventDefault();
+  if (!props.disabled && !DBstore.globalFileIsUploading) {
     isDragOver.value = true;
   }
 }
 
 function onDragLeave(event: DragEvent) {
+  event.preventDefault();
   isDragOver.value = false;
 }
 
@@ -280,49 +225,25 @@ interface ColumnRolesEvent {
   startLine: number;
 }
 
-async function confirmColumnRoles(event: ColumnRolesEvent) {
-  console.log('confirmColumnRoles called');
+async function onConfirm(data: { columnRoles: string[]; startLine: number }) {
+  console.log('Confirm clicked with data:', data);
   showModal.value = false;
-  columnRoles.value = event.columnRoles.map(role => {
-    if (props.DBname === DBName.AZ) {
-      return role as AZColumnRole;
-    } else {
-      return role as USColumnRole;
-    }
-  });
-  startLine.value = event.startLine;
-  if (file.value?.name.endsWith('.xlsx') && canUseXlsx.value) {
-    await parseXLSXForFullProcessing();
-  } else {
-    await csvProcessor.parseCSVForFullProcessing();
+  
+  try {
+    await fileProcessor.parseFileForFullProcessing(file.value!, data.columnRoles, data.startLine);
+    console.log('File processed successfully');
+  } catch (error) {
+    console.error('Error processing file:', error);
+    // Handle error (e.g., show error message)
+  } finally {
+    resetFileState();
   }
 }
 
-function cancelModal() {
-  console.log('cancelModal called in UploadComponent');
+function onCancel() {
+  console.log('Cancel clicked');
   showModal.value = false;
-  csvShowModal.value = false;
-  
-  if (!file.value) {
-    console.log('No file to cancel');
-    return;
-  }
-
-  const isXlsxFile = file.value.name.endsWith('.xlsx');
-  file.value = null;
-
-  if (isXlsxFile) {
-    previewData.value = [];
-    columns.value = [];
-    columnRoles.value = [];
-    startLine.value = 1;
-  } else {
-    csvProcessor.columns.value = [];
-    csvProcessor.previewData.value = [];
-    csvProcessor.columnRoles.value = [];
-    csvProcessor.startLine.value = 1;
-  }
-  // Reset any other necessary state
+  resetFileState();
 }
 
 function selectFile(): void {
@@ -337,19 +258,6 @@ function selectFile(): void {
 
 const highlightedWord = computed(() => {
   return props.typeOfComponent === 'owner' ? 'YOUR' : 'CARRIER';
-});
-
-// Near the top of your script section, after initializing canUseXlsx
-console.log('Initial canUseXlsx value:', canUseXlsx.value);
-
-// If canUseXlsx is reactive, you might want to watch it
-watch(canUseXlsx, (newValue) => {
-  console.log('canUseXlsx changed to:', newValue);
-});
-
-// Add this watch as well
-watch(showModal, (newValue) => {
-  console.log('showModal changed in UploadComponent:', newValue);
 });
 </script>
 
