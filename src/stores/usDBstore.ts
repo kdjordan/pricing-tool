@@ -13,9 +13,8 @@ type ReportStateType = typeof ReportState[keyof typeof ReportState];
 
 export const useDBstate = defineStore('usStore', {
   state: () => ({
-    globalDBVersion: 1,
     filesUploaded: new Map<string, FileUpload>() as UploadedFileTracker,
-    globalFileIsUploading: false,
+    
     componentFileIsUploading: undefined as string | undefined,
     showUsUploadComponents: true,
     usReportsGenerated: false,
@@ -122,10 +121,7 @@ export const useDBstate = defineStore('usStore', {
     setGlobalFileIsUploading(isUploading: boolean) {
       this.globalFileIsUploading = isUploading;
     },
-    incrementGlobalDBVersion() {
-      this.globalDBVersion++
-      console.log('updated globalDBVersion ', this.globalDBVersion)
-    },
+
     addFileUploaded(componentName: string, dbName: DBName, fileName: string) {
       if (this.filesUploaded.has(componentName)) {
         console.warn(`Overwriting existing file for component: ${componentName}`);
