@@ -2,12 +2,12 @@ import { ref } from 'vue';
 import Papa from 'papaparse';
 import {
 	type StandardizedData,
-	type AZStandardizedData,
 	type USStandardizedData,
 	DBName,
 	IndetermRateType
 } from '../../types/app-types';
-import { useDBstate } from '@/stores/dbStore';
+import { type AZStandardizedData } from '../../types/az-types';
+import { useDBstate } from '@/stores/azDBstore';
 import useIndexedDB from './useIndexDB';
 
 const { storeInIndexedDB, deleteObjectStore } =
@@ -21,7 +21,7 @@ export default function useCSVProcessing() {
 	const startLine = ref<number>(1); // Adjust default start line if needed
 	const columnRoles = ref<string[]>([]); // Ensure columnRoles is properly defined
 	const DBname = ref<DBName | null>(null);
-	
+
 	const componentName = ref<string>('');
 	const previewData = ref<string[][]>([]);
 	const columns = ref<string[]>([]);
@@ -86,7 +86,7 @@ export default function useCSVProcessing() {
 					columnRoles.value.forEach((role, index) => {
 						if (role && index < row.length) {
 							const value = row[index].trim();
-							
+
 							switch (role) {
 								case 'NPA':
 									standardizedRow.npa = processNPA(value);
@@ -123,12 +123,12 @@ export default function useCSVProcessing() {
 						// If 'default' is selected and no explicit ijRate was set, use intraRate as fallback
 						standardizedRow.ijRate = intraRate;
 					}
-					
+
 					const isValidNPA = !isNaN(standardizedRow.npa);
 					const isValidNXX = !isNaN(standardizedRow.nxx);
-					const isValidRates = !isNaN(standardizedRow.interRate) && 
-										 !isNaN(standardizedRow.intraRate) && 
-										 !isNaN(standardizedRow.ijRate);
+					const isValidRates = !isNaN(standardizedRow.interRate) &&
+						!isNaN(standardizedRow.intraRate) &&
+						!isNaN(standardizedRow.ijRate);
 
 					if (isValidNPA && isValidNXX && isValidRates) {
 						standardizedData.push(standardizedRow);
@@ -136,10 +136,10 @@ export default function useCSVProcessing() {
 						console.error('Issue parsing US file row', rowIndex, standardizedRow);
 					}
 				});
-				
+
 				storeDataInIndexedDB(standardizedData);
 			},
-			error: function(error) {
+			error: function (error) {
 				console.error('Error parsing CSV:', error);
 				throw error;
 			}
@@ -195,7 +195,7 @@ export default function useCSVProcessing() {
 							}
 						}
 					});
-					
+
 					const isValidDestName = typeof standardizedRow.destName === 'string' && standardizedRow.destName.length > 0;
 					const isValidDialCode = !isNaN(standardizedRow.dialCode);
 					const isValidRate = !isNaN(standardizedRow.rate);
@@ -206,10 +206,10 @@ export default function useCSVProcessing() {
 						console.error('Issue parsing AZ file row', standardizedRow);
 					}
 				});
-				
+
 				storeDataInIndexedDB(standardizedData);
 			},
-			error: function(error) {
+			error: function (error) {
 				console.error('Error parsing CSV:', error);
 				throw error;
 			}
@@ -220,14 +220,14 @@ export default function useCSVProcessing() {
 		try {
 			Papa.parse(uploadedFile, {
 				header: false,
-					complete(results) {
-						previewData.value = results.data.slice(0, 25) as string[][];
-						columns.value = results.data[
-							startLine.value - 1
-						] as string[];
-						columnRoles.value = Array(columns.value.length).fill('');
-						showModal.value = true;
-					},
+				complete(results) {
+					previewData.value = results.data.slice(0, 25) as string[][];
+					columns.value = results.data[
+						startLine.value - 1
+					] as string[];
+					columnRoles.value = Array(columns.value.length).fill('');
+					showModal.value = true;
+				},
 			});
 		} catch {
 			console.error('error uploading file');
@@ -235,7 +235,7 @@ export default function useCSVProcessing() {
 	}
 
 	//function reaches out to IndesBB composable to store data
-	async function storeDataInIndexedDB(data: StandardizedData[]) {	
+	async function storeDataInIndexedDB(data: StandardizedData[]) {
 		console.log('storing with ', DBname.value, componentName.value)
 		try {
 			if (file.value) {
@@ -251,7 +251,7 @@ export default function useCSVProcessing() {
 		}
 	}
 
-	
+
 	async function removeFromDB() {
 		let storeName = DBstore.getStoreNameByComponent(
 			componentName.value

@@ -1,14 +1,17 @@
 <template>
-	<div id="az-pricing" class="flex flex-col items-center pt-8 h-full w-full">
+	<div
+		id="az-pricing"
+		class="flex flex-col items-center pt-8 h-full w-full"
+	>
 		<div
-			v-if="dbStore.getAzReportsGenerated"
+			v-if="dbStore.getUsReportsGenerated"
 			class="flex justify-center mb-4"
 		>
 			<button
-				@click="dbStore.setActiveReportAZ('files')"
+				@click="dbStore.setActiveReportUS('files')"
 				:class="[
 					'px-4 py-2 mx-2 rounded-lg transition-colors duration-200',
-					dbStore.getActiveReportAZ === 'files'
+					dbStore.getActiveReportUS === 'files'
 						? 'bg-blue-500 text-white'
 						: 'bg-gray-500 text-gray-300 hover:bg-gray-600',
 				]"
@@ -16,10 +19,10 @@
 				Files
 			</button>
 			<button
-				@click="dbStore.setActiveReportAZ('code')"
+				@click="dbStore.setActiveReportUS('code')"
 				:class="[
 					'px-4 py-2 mx-2 rounded-lg transition-colors duration-200',
-					dbStore.getActiveReportAZ === 'code'
+					dbStore.getActiveReportUS === 'code'
 						? 'bg-blue-500 text-white'
 						: 'bg-gray-500 text-gray-300 hover:bg-gray-600',
 				]"
@@ -27,10 +30,10 @@
 				Code Report
 			</button>
 			<button
-				@click="dbStore.setActiveReportAZ('pricing')"
+				@click="dbStore.setActiveReportUS('pricing')"
 				:class="[
 					'px-4 py-2 mx-2 rounded-lg transition-colors duration-200',
-					dbStore.getActiveReportAZ === 'pricing'
+					dbStore.getActiveReportUS === 'pricing'
 						? 'bg-blue-500 text-white'
 						: 'bg-gray-500 text-gray-300 hover:bg-gray-600',
 				]"
@@ -45,19 +48,19 @@
 			</button>
 		</div>
 		<div>
-			<AZFileUploads v-if="dbStore.getActiveReportAZ === 'files'" />
-			<CodeReportAZ
-				v-if="dbStore.getActiveReportAZ === 'code'"
-				:report="dbStore.getAzCodeReport"
+			<USFileUploads v-if="dbStore.getActiveReportUS === 'files'" />
+			<CodeReportUS
+				v-if="dbStore.getActiveReportUS === 'code'"
+				:report="dbStore.getUsCodeReport"
 			/>
-			<PricingReportAZ
-				v-if="dbStore.getActiveReportAZ === 'pricing'"
-				:report="dbStore.getAzPricingReport"
+			<PricingReportUS
+				v-if="dbStore.getActiveReportUS === 'pricing'"
+				:report="dbStore.getUsPricingReport"
 			/>
 			<div
 				v-if="
-					!dbStore.getAzCodeReport == null &&
-					!dbStore.getAzPricingReport
+					!dbStore.getUsCodeReport == null &&
+					!dbStore.getUsPricingReport
 				"
 			>
 				No reports available.
@@ -67,17 +70,17 @@
 </template>
 
 <script setup lang="ts">
-	import AZFileUploads from '../components/AZFileUploads.vue';
-	import CodeReportAZ from '../components/AZCodeReport.vue';
-	import PricingReportAZ from '../components/AZPricingReport.vue';
+	import USFileUploads from '../components/US/USFileUploads.vue';
+	import CodeReportUS from '../components/US/USCodeReport.vue';
+	import PricingReportUS from '../components/US/USPricingReport.vue';
 	import { resetReportApi } from '@/API/api';
-	import { useDBstate } from '@/stores/dbStore';
+	import { useDBstate } from '@/stores/usDBstore';
 
 	const dbStore = useDBstate();
 
 	async function handleReset() {
-		console.log('Resetting the AZ report');
-		dbStore.setActiveReportAZ('files');
-		await resetReportApi('az');
+		console.log('Resetting the US report');
+		dbStore.setActiveReportUS('files');
+		await resetReportApi('us');
 	}
 </script>

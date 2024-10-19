@@ -4,7 +4,7 @@
 			<h1
 				class="text-5xl font-bold text-foreground uppercase inline-block"
 			>
-				AZ CODE REPORT
+				US CODE REPORT
 			</h1>
 		</div>
 
@@ -109,14 +109,10 @@
 </template>
 
 <script setup lang="ts">
-	import { type AzCodeReport } from '../../types/app-types';
-	import { resetReportApi } from '@/API/api';
-	import { useDBstate } from '@/stores/dbStore';
-
-	const dbStore = useDBstate();
+	import { type UsCodeReport } from '../../../types/us-types';
 
 	const props = defineProps<{
-		report: AzCodeReport | null;
+		report: UsCodeReport | null;
 	}>();
 
 	const fileKeys = ['file1', 'file2'] as const;
@@ -140,5 +136,5 @@
 			'0.00'
 		);
 	}
-
 </script>
+

@@ -1,5 +1,5 @@
 import { type StandardizedData, DBName } from './../../types/app-types';
-import { useDBstate } from '@/stores/dbStore';
+import { useDBstate } from '@/stores/azDBstore';
 import { openDB } from 'idb';
 
 

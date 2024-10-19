@@ -99,10 +99,11 @@
 <script setup lang="ts">
 	import TheModal from './TheModal.vue';
 	import { ColumnRolesEvent, DBName } from '../../types/app-types';
-	import UploadIcon from './UploadIcon.vue';
+	import UploadIcon from './icons/UploadIcon.vue';
 	import { ref, watch, computed } from 'vue';
 	import useCSVProcessing from '../composables/useCsvFiles';
-	import { useDBstate } from '@/stores/dbStore';
+	import { useDBstate as useAzDBstate } from '@/stores/azDBstore';
+	import { useDBstate as useUsDBstate } from '@/stores/usDBstore';
 
 	// Component props
 	const props = defineProps<{
@@ -130,24 +131,27 @@
 		indetermRateType,
 	} = useCSVProcessing();
 
+	// Determine which store to use based on the DBname prop
+	const DBstore = computed(() => {
+		return props.DBname === 'az' ? useAzDBstate() : useUsDBstate();
+	});
+
 	// Define reactive properties
 	const fileInput = ref<HTMLInputElement | null>(null);
 	const isDragOver = ref<boolean>(false);
 	const statusMessage = ref<string>('Drag file or click to upload');
 	const displayMessage = ref<string>('');
 	// Set DB name and component name from props
-	const DBstore = useDBstate();
-
 	DBname.value = props.DBname;
 	componentName.value = props.componentName;
 	deckType.value = props.DBname;
 
 	// Computed property to get the file name if the component is disabled
-	const fileName = computed(() => {
-		return props.disabled
-			? DBstore.getStoreNameByComponent(props.componentName)
-			: '';
-	});
+	// const fileName = computed(() => {
+	// 	return props.disabled
+	// 		? DBstore.getStoreNameByComponent(props.componentName)
+	// 		: '';
+	// });
 
 	// Setup displayMessage based on componentType prop
 	const updateDisplayMessage = (type: string) => {
@@ -156,9 +160,11 @@
 		} else if (type === 'client') {
 			displayMessage.value = 'Upload CARRIER rates as CSV';
 		} else if (type === 'complete') {
-			displayMessage.value = DBstore.getStoreNameByComponent(
-				props.componentName
-			);
+			displayMessage.value = 'check your reports'
+			
+			// DBstore.getStoreNameByComponent(
+			// 	props.componentName
+			// );
 		}
 	};
 
@@ -207,7 +213,7 @@
 	function dumpFile() {
 		removeFromDB();
 		resetLocalState();
-		DBstore.setAzReportsGenerated(false);
+		DBstore.setReportsGenerated(false);
 	}
 
 	function resetLocalState() {

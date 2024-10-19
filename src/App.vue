@@ -1,16 +1,20 @@
 <template>
-  <div id="app" class="flex flex-col min-h-screen bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 text-foreground tracking-wider">
-    <TheHeader class="w-full z-10 fixed top-0" />
-    <div class="flex flex-grow overflow-hidden w-full mt-20">
-      <SideNav class="z-20" />
-      <div class="flex flex-col flex-grow w-full ml-[200px]"> <!-- Adjust 250px to your SideNav width -->
-        <main class="flex-grow flex justify-center items-center">
-          <router-view />
-        </main>
-        <TheFooter class="w-full" />
-      </div>
-    </div>
-  </div>
+	<div
+		id="app"
+		class="flex flex-col min-h-screen bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 text-foreground tracking-wider"
+	>
+		<TheHeader class="w-full z-10 fixed top-0" />
+		<div class="flex flex-grow overflow-hidden w-full mt-20">
+			<SideNav class="z-20" />
+			<div class="flex flex-col flex-grow w-full ml-[200px]">
+				<!-- Adjust 250px to your SideNav width -->
+				<main class="flex-grow flex justify-center items-center">
+					<router-view />
+				</main>
+				<TheFooter class="w-full" />
+			</div>
+		</div>
+	</div>
 </template>
 
 <script setup>
@@ -19,7 +23,7 @@
 	import TheFooter from './components/TheFooter.vue';
 	import { openDB } from 'idb';
 	import { onMounted, onBeforeUnmount } from 'vue';
-	import { useDBstate } from '@/stores/dbStore';
+	import { useDBstate } from '@/stores/azDBstore';
 	import { useUserStore } from '@/stores/userStore';
 	import { deleteAllDbsApi } from '@/API/api';
 	import { PlanTier } from '../types/app-types';
@@ -35,7 +39,7 @@
 
 	onMounted(() => {
 		window.addEventListener('beforeunload', handleBeforeUnload);
-		setUser('free', true, ['az']);
+		// setUser('free', true, ['us']);
 	});
 
 	onBeforeUnmount(() => {
@@ -57,7 +61,10 @@
 			} else if (dataType === 'us') {
 				const [, npa, nxx, interRate, intraRate, ijRate] = columns;
 				let processedNpa = npa.trim();
-				if (processedNpa.startsWith('1') && processedNpa.length === 4) {
+				if (
+					processedNpa.startsWith('1') &&
+					processedNpa.length === 4
+				) {
 					processedNpa = processedNpa.slice(1);
 				}
 				return {
@@ -75,11 +82,11 @@
 		const userInfo = {
 			email: plan === 'free' ? 'free@example.com' : 'pro@example.com',
 			username: plan === 'free' ? 'FreeUser' : 'ProUser',
-				planTier: plan === 'free' ? PlanTier.FREE : PlanTier.PRO,
+			planTier: plan === 'free' ? PlanTier.FREE : PlanTier.PRO,
 		};
 		userStore.setUser(userInfo);
 		if (populateDb) {
-			dataTypes.forEach(dataType => loadDb(dataType));
+			dataTypes.forEach((dataType) => loadDb(dataType));
 		}
 	}
 
@@ -89,10 +96,19 @@
 			const db = await openDB(dbName, 1, {
 				upgrade(db) {
 					if (dataType === 'az') {
-						db.createObjectStore('AZtest1.csv', { keyPath: 'id', autoIncrement: true });
-						db.createObjectStore('AZtest2.csv', { keyPath: 'id', autoIncrement: true });
+						db.createObjectStore('AZtest1.csv', {
+							keyPath: 'id',
+							autoIncrement: true,
+						});
+						db.createObjectStore('AZtest2.csv', {
+							keyPath: 'id',
+							autoIncrement: true,
+						});
 					} else if (dataType === 'us') {
-						db.createObjectStore('npa_nxx.csv', { keyPath: 'id', autoIncrement: true });
+						db.createObjectStore('npa_nxx.csv', {
+							keyPath: 'id',
+							autoIncrement: true,
+						});
 					}
 				},
 			});
@@ -122,7 +138,10 @@
 				await storeData(db, 'npa_nxx.csv', dataFile);
 			}
 		} catch (error) {
-			console.error(`Error loading ${dataType} CSV into IndexedDB:`, error);
+			console.error(
+				`Error loading ${dataType} CSV into IndexedDB:`,
+				error
+			);
 		}
 	}
 	// Function to store data in the specified object store
@@ -147,5 +166,4 @@
 	.wborder {
 		border: 10px solid white;
 	}
-
 </style>

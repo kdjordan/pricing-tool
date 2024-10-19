@@ -1,7 +1,9 @@
 import { deleteIndexedDBDatabase } from '@/utils/resetIndexDb';
 import AzComparisonWorker from '@/workers/az/az-comparison.worker?worker';
-import { type AZReportsInput, type AzPricingReport, type AzCodeReport } from '../../types/app-types';
-import { useDBstate } from '@/stores/dbStore';
+import UsComparisonWorker from '@/workers/us/us-comparison.worker?worker';
+import { type AZReportsInput, type AzPricingReport, type AzCodeReport } from '../../types/az-types';
+import { type USReportsInput, type UsPricingReport, type UsCodeReport } from '../../types/us-types';
+import { useDBstate } from '@/stores/azDBstore';
 
 export async function resetReportApi(reportType: string) {
   await deleteDbApi(reportType);
@@ -45,6 +47,25 @@ export async function makeAzReportsApi(input: AZReportsInput): Promise<{ pricing
     };
   });
 }
+
+export async function makeUsReportsApi(input: USReportsInput): Promise<{ pricingReport: UsPricingReport, codeReport: UsCodeReport }> {
+  const worker = new UsComparisonWorker();
+
+  worker.postMessage(input);
+
+  return new Promise((resolve, reject) => {
+    worker.onmessage = (event) => {
+      const { pricingReport, codeReport } = event.data;
+      resolve({ pricingReport, codeReport });
+    };
+
+    worker.onerror = (error) => {
+      console.error('Error from worker:', error);
+      reject(error);
+    };
+  });
+}
+
 
 function forceRefreshApi() {
   window.location.reload();
