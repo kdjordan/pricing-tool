@@ -1,19 +1,45 @@
 <template>
   <div class="upload-component">
     <div
-      class="relative border border-fbWhite border-dashed rounded-lg p-6 hover:bg-fbWhite/10"
+      class="relative border rounded-lg p-6 transition-all duration-200"
       :class="[
-        isProcessingState || disabled || isUploading
-          ? 'border-gray-500 bg-gray-800/50'
-          : 'border-accent hover:border-accent-hover',
-        isProcessingState || disabled || isUploading ? 'cursor-not-allowed' : 'cursor-pointer',
-        isDragging ? 'border-accent bg-fbWhite/10' : '',
+        // Base states
+        hasFile 
+          ? 'border-accent border-solid' // File uploaded - solid green border
+          : 'border-gray-500 border-dashed hover:border-accent/50', // Empty state - dashed muted border
+        
+        // Processing/disabled states
+        isProcessingState || disabled || isUploading 
+          ? 'bg-gray-800/50 cursor-not-allowed' 
+          : 'cursor-pointer hover:bg-fbWhite/10',
+        
+        // Drag state
+        isDragging ? 'border-accent bg-fbWhite/10 border-dashed' : '',
       ]"
       @dragenter.prevent="handleDragEnter"
       @dragleave.prevent="handleDragLeave"
       @dragover.prevent
       @drop.prevent="handleDrop"
     >
+      <!-- Processing Overlay -->
+      <div 
+        v-if="isProcessingState" 
+        class="absolute inset-0 bg-background/80 backdrop-blur-sm 
+               flex items-center justify-center rounded-lg overflow-hidden"
+      >
+        <!-- Full container pulse effect -->
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="w-full h-full bg-accent/5 rounded-lg 
+                    animate-[pulse_2s_cubic-bezier(0,0,0.2,1)_infinite]">
+          </div>
+        </div>
+        
+        <!-- Processing Text -->
+        <span class="text-background font-medium z-10 bg-accent/20 px-4 py-1 rounded-full">
+          Processing...
+        </span>
+      </div>
+
       <!-- Upload Zone -->
       <div class="flex flex-col items-center justify-center space-y-2">
         <input
@@ -206,9 +232,23 @@
     if (!file.value) return 'File uploaded successfully'
     return file.value.name
   })
+
+  // Add computed property for file state
+  const hasFile = computed(() => Boolean(file.value))
 </script>
 <style scoped>
   .upload-component {
     @apply w-full;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 0.1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.3;
+      transform: scale(1.05);
+    }
   }
 </style>
